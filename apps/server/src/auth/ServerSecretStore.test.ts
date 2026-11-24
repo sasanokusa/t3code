@@ -6,6 +6,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
 import * as PlatformError from "effect/PlatformError";
 
@@ -172,6 +173,42 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("ServerSecretStor
 
       assert.deepEqual(Array.from(second), Array.from(first));
     }).pipe(Effect.provide(layerServerSecretStore())),
+  );
+
+  it.effect("keeps secrets sealed on disk", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const { secretsDir } = yield* ServerConfig.ServerConfig;
+      const secretStore = yield* ServerSecretStore.ServerSecretStore;
+      yield* secretStore.set("provider-api-key", new TextEncoder().encode("sk-live-do-not-leak"));
+
+      const onDisk = yield* fileSystem.readFile(path.join(secretsDir, "provider-api-key.bin"));
+      assert.equal(new TextDecoder().decode(onDisk.subarray(0, 4)), "T3E1");
+      assert.notInclude(new TextDecoder().decode(onDisk), "sk-live-do-not-leak");
+      const read = yield* secretStore.get("provider-api-key");
+      assert.equal(new TextDecoder().decode(Option.getOrThrow(read)), "sk-live-do-not-leak");
+    }).pipe(Effect.provide(Layer.provideMerge(ServerSecretStore.layer, layerServerConfig()))),
+  );
+
+  it.effect("seals plaintext secrets an older build left behind", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const { secretsDir } = yield* ServerConfig.ServerConfig;
+      const legacyPath = path.join(secretsDir, "legacy-token.bin");
+      yield* fileSystem.makeDirectory(secretsDir, { recursive: true });
+      yield* fileSystem.writeFileString(legacyPath, "sk-legacy-plaintext");
+
+      const secretStore = yield* ServerSecretStore.make;
+
+      assert.notInclude(
+        new TextDecoder().decode(yield* fileSystem.readFile(legacyPath)),
+        "sk-legacy-plaintext",
+      );
+      const read = yield* secretStore.get("legacy-token");
+      assert.equal(new TextDecoder().decode(Option.getOrThrow(read)), "sk-legacy-plaintext");
+    }).pipe(Effect.provide(layerServerConfig())),
   );
 
   it.effect("refuses a name that would leave the secrets directory", () =>

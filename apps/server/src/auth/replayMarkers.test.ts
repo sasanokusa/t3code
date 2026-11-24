@@ -69,7 +69,10 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("replayMarkers", 
 
       yield* pruneExpiredReplayMarkers();
 
-      const remaining = yield* fileSystem.readDirectory(secretsDir);
+      // The secret store's own key bookkeeping lives here too; pruning must leave it alone.
+      const remaining = (yield* fileSystem.readDirectory(secretsDir)).filter(
+        (name) => name !== "encryption.json" && name !== "master.key",
+      );
       assert.deepStrictEqual(
         remaining.toSorted(),
         [

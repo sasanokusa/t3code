@@ -30,6 +30,8 @@ const writeHeapSnapshot = Effect.fn("server.heapSnapshot", { root: true })(
       try: () => NodeV8.writeHeapSnapshot(path),
       catch: (cause) => new HeapSnapshotWriteError({ path, cause }),
     }).pipe(Effect.tapError(() => fs.remove(path, { force: true }).pipe(Effect.ignore)));
+    // A heap snapshot holds every secret the server has in memory.
+    yield* fs.chmod(path, 0o600).pipe(Effect.ignore);
     yield* Effect.logInfo("Wrote heap snapshot.", { path });
   },
   Effect.catch((cause) => Effect.logWarning("Failed to write heap snapshot.", { cause })),
@@ -38,6 +40,9 @@ const writeHeapSnapshot = Effect.fn("server.heapSnapshot", { root: true })(
 export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     if ((yield* HostProcess.Platform) === "win32") return;
+    // Hardened fork: any process of the same user can send SIGUSR2, and the snapshot holds every
+    // secret in memory (tokens, resolved 1Password values). Off unless explicitly asked for.
+    if ((yield* HostProcess.Environment).T3CODE_HEAP_SNAPSHOT_ON_SIGUSR2 !== "1") return;
     const { logsDir } = yield* ServerConfig.ServerConfig;
     const runFork = Effect.runForkWith(yield* Effect.context<FileSystem.FileSystem>());
     const onSignal = () => void runFork(writeHeapSnapshot(logsDir));

@@ -10,7 +10,9 @@ import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as ServerConfig from "../config.ts";
+import * as SecretsEncryption from "./SecretsEncryption.ts";
 
 const secretStoreErrorContext = {
   resource: Schema.String,
@@ -181,6 +183,41 @@ export const make = Effect.gen(function* () {
     ),
   );
 
+  // Hardened fork: secrets are sealed with a key from the OS credential store (see
+  // SecretsEncryption.ts) instead of sitting in plaintext.
+  const hostPlatform = yield* HostProcess.Platform;
+  const hostEnvironment = yield* HostProcess.Environment;
+  const masterKey = yield* Effect.try({
+    try: () =>
+      SecretsEncryption.loadMasterKey({
+        secretsDir: serverConfig.secretsDir,
+        platform: hostPlatform,
+        env: hostEnvironment,
+      }),
+    catch: (cause) =>
+      new SecretStoreSecureError({
+        resource: `secrets key for ${serverConfig.secretsDir}`,
+        cause,
+      }),
+  });
+  if (masterKey.warning !== undefined) yield* Effect.logWarning(masterKey.warning);
+  const seal = (name: string, value: Uint8Array) =>
+    SecretsEncryption.seal(masterKey.key, name, value);
+  const unseal = (name: string, bytes: Uint8Array) =>
+    SecretsEncryption.isEncrypted(bytes)
+      ? Effect.try({
+          try: () => SecretsEncryption.open(masterKey.key, name, bytes),
+          catch: (cause) => new SecretStoreDecodeError({ resource: `secret ${name}`, cause }),
+        })
+      : // A plaintext file from an older build or another tool; sealed on the next start.
+        Effect.succeed(Uint8Array.from(bytes));
+
+  // An empty file is the legacy "no usable secret" state getOrCreateRandom repairs.
+  const unsealStored = (name: string, stored: Option.Option<Uint8Array>) =>
+    Option.isSome(stored) && stored.value.byteLength > 0
+      ? unseal(name, stored.value).pipe(Effect.asSome)
+      : Effect.succeed(stored);
+
   // Some names carry text from outside the server; one with a separator would leave the directory.
   const resolveSecretPath = (name: string): Effect.Effect<string, SecretStoreNameError> =>
     /[/\\\0]/.test(name)
@@ -205,6 +242,7 @@ export const make = Effect.gen(function* () {
                   }),
                 ),
           ),
+          Effect.flatMap((stored) => unsealStored(name, stored)),
         ),
       ),
       Effect.withSpan("ServerSecretStore.get"),
@@ -228,7 +266,7 @@ export const make = Effect.gen(function* () {
       Effect.flatMap((uuid) => {
         const tempPath = `${secretPath}.${uuid}.tmp`;
         return Effect.gen(function* () {
-          yield* fileSystem.writeFile(tempPath, value);
+          yield* fileSystem.writeFile(tempPath, seal(name, value), { mode: 0o600 });
           yield* fileSystem.chmod(tempPath, 0o600);
           yield* fileSystem.rename(tempPath, secretPath);
           yield* fileSystem.chmod(secretPath, 0o600);
@@ -270,7 +308,7 @@ export const make = Effect.gen(function* () {
           yield* Effect.scoped(
             Effect.gen(function* () {
               const file = yield* fileSystem.open(tempPath, { flag: "wx", mode: 0o600 });
-              yield* file.writeAll(value);
+              yield* file.writeAll(seal(name, value));
               yield* file.sync;
             }),
           );
@@ -362,6 +400,33 @@ export const make = Effect.gen(function* () {
       ),
       Effect.withSpan("ServerSecretStore.remove"),
     );
+
+  // Seal plaintext secrets left by upstream builds. A failure leaves that file as it was.
+  const legacy = yield* fileSystem.readDirectory(serverConfig.secretsDir).pipe(
+    Effect.map((names) => names.filter((name) => name.endsWith(".bin"))),
+    Effect.orElseSucceed((): ReadonlyArray<string> => []),
+  );
+  let sealedCount = 0;
+  for (const file of legacy) {
+    const name = file.slice(0, -".bin".length);
+    const sealed = yield* fileSystem.readFile(path.join(serverConfig.secretsDir, file)).pipe(
+      Effect.flatMap((bytes) =>
+        bytes.byteLength === 0 || SecretsEncryption.isEncrypted(bytes)
+          ? Effect.succeed(false)
+          : set(name, Uint8Array.from(bytes)).pipe(Effect.as(true)),
+      ),
+      Effect.catchCause((cause) =>
+        Effect.logWarning(`Could not seal plaintext secret ${name}`, cause).pipe(Effect.as(false)),
+      ),
+    );
+    if (sealed) sealedCount += 1;
+  }
+  if (sealedCount > 0) {
+    yield* Effect.logInfo("Sealed plaintext secrets with the OS-held key.", {
+      count: sealedCount,
+      keySource: masterKey.source,
+    });
+  }
 
   return ServerSecretStore.of({
     directory: serverConfig.secretsDir,
