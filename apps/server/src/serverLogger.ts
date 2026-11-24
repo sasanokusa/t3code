@@ -1,5 +1,6 @@
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as SharedObservability from "@t3tools/shared/observability";
+import { redactSecrets, secretRedactionEnabled } from "@t3tools/shared/secretRedaction";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -12,10 +13,25 @@ import * as OtlpLogger from "effect/observability/OtlpLogger";
 import * as ServerConfig from "./config.ts";
 import * as OtlpExportFailures from "./observability/OtlpExportFailures.ts";
 
+// Hardened fork: string messages are masked too (keys, tokens, credential-named values).
+const redactSecretsInMessages = secretRedactionEnabled(process.env);
+const redactMessage = (message: unknown): unknown =>
+  !redactSecretsInMessages
+    ? message
+    : typeof message === "string"
+      ? redactSecrets(message)
+      : Array.isArray(message)
+        ? message.map(redactMessage)
+        : message;
+
 // HTTP errors logged with --log-ws-events carry the request URL and its connection ticket.
 const redactingCredentials = <Output>(logger: Logger.Logger<unknown, Output>) =>
   Logger.make<unknown, Output>((options) =>
-    logger.log({ ...options, cause: SharedObservability.redactCauseCredentials(options.cause) }),
+    logger.log({
+      ...options,
+      message: redactMessage(options.message),
+      cause: SharedObservability.redactCauseCredentials(options.cause),
+    }),
   );
 
 // consolePretty collapses Cause fields via util.inspect; render them with Cause.pretty like standalone arguments.

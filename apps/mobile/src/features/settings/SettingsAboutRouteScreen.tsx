@@ -18,6 +18,7 @@ import {
   runAppUpdateCheck,
 } from "../updates/app-updates";
 import { SettingsRow } from "./components/SettingsRow";
+import { LEGAL_DOCUMENTS_AVAILABLE } from "./lib/legal-document-url";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsScreen } from "./components/SettingsScreen";
 
@@ -140,7 +141,9 @@ function AppSettingsSection() {
         label={gt("Open source licenses")}
         target="SettingsOpenSourceLicenses"
       />
-      <SettingsRow icon="doc.text" label={gt("Legal")} fullScreenTarget="SettingsLegal" />
+      {LEGAL_DOCUMENTS_AVAILABLE ? (
+        <SettingsRow icon="doc.text" label={gt("Legal")} fullScreenTarget="SettingsLegal" />
+      ) : null}
       {updateCheckAvailable ? (
         <Pressable
           accessibilityLabel={gt("Version {version}", { version: versionLabel })}

@@ -17,6 +17,10 @@ function resolveMarketingSiteUrl(override: string | undefined): URL {
 }
 
 const MARKETING_SITE_URL = resolveMarketingSiteUrl(process.env.EXPO_PUBLIC_MARKETING_SITE_URL);
+// Hardened fork: the default site is T3's, so legal pages are offered only for a configured site.
+export const LEGAL_DOCUMENTS_AVAILABLE = Boolean(
+  process.env.EXPO_PUBLIC_MARKETING_SITE_URL?.trim(),
+);
 
 function marketingSiteDocumentUrl(path: string): string {
   return new URL(path, MARKETING_SITE_URL).toString();

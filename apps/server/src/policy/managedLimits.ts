@@ -25,6 +25,7 @@ import * as Schema from "effect/Schema";
 import * as NetService from "@t3tools/shared/Net";
 
 import { loopbackBindAddress } from "../auth/utils.ts";
+import { forkAllowsConnect } from "../cloud/publicConfig.ts";
 
 type PolicyDocument = { readonly document: ManagedPolicyDocument | undefined };
 
@@ -72,9 +73,12 @@ export function allowsAuthPolicy(policy: PolicyDocument, authPolicy: ServerAuthP
 export const allowsRemoteClients = (policy: PolicyDocument) =>
   allowsAuthPolicy(policy, "remote-reachable");
 
-/** T3 Connect is a way for remote clients in, so a policy without `remote` turns it off too. */
-export const allowsConnect = (policy: PolicyDocument) =>
-  policy.document?.limits?.connect !== false && allowsRemoteClients(policy);
+/**
+ * T3 Connect is a way for remote clients in, so a policy without `remote` turns it off too.
+ * Hardened fork: it also needs a self-hosted relay (`T3CODE_RELAY_URL`); T3's relay is never used.
+ */
+export const allowsConnect = (policy: PolicyDocument, forkAllows = forkAllowsConnect()) =>
+  forkAllows && policy.document?.limits?.connect !== false && allowsRemoteClients(policy);
 
 const refuse = (policy: PolicyDocument, action: string, detail?: string) =>
   new ManagedPolicyRefusedError({

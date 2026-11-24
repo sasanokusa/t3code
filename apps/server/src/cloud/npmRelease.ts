@@ -3,7 +3,10 @@ import {
   ServerNpmReleaseInput,
   type ServerNpmRelease,
 } from "@t3tools/contracts";
-import { npmReleaseDatabaseMigration } from "@t3tools/shared/cliRelease";
+import {
+  CLI_SELF_UPDATE_DISABLED_REASON,
+  npmReleaseDatabaseMigration,
+} from "@t3tools/shared/cliRelease";
 import { resolveCommandPath } from "@t3tools/shared/shell";
 import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
@@ -117,6 +120,10 @@ export const make = Effect.fn("NpmRelease.make")(function* () {
   });
   return NpmRelease.of({
     get: Effect.fn("NpmRelease.get")(function* (input) {
+      // Hardened fork: never look up the upstream `t3` package on npm.
+      if (CLI_SELF_UPDATE_DISABLED_REASON !== undefined) {
+        return yield* new ServerNpmReleaseError({ reason: CLI_SELF_UPDATE_DISABLED_REASON });
+      }
       const { spec } = yield* decodeInput(input).pipe(
         Effect.mapError(
           () => new ServerNpmReleaseError({ reason: "Invalid release version or track." }),

@@ -16,6 +16,7 @@ import * as Tracer from "effect/Tracer";
 import { OtlpResource, OtlpTracer, OtlpSerialization } from "effect/observability";
 
 import { makeAsyncRotatingFileSink } from "./logging.ts";
+import { redactSecrets, secretRedactionEnabled } from "./secretRedaction.ts";
 
 export const OtlpProtocol = Schema.Literals(["http/json", "http/protobuf"]);
 export type OtlpProtocol = typeof OtlpProtocol.Type;
@@ -411,8 +412,12 @@ function spanToTraceRecord(span: SerializableSpan): EffectTraceRecord {
 // WebSocket tickets and their DPoP proofs ride in URL queries and stay valid after the request.
 const URL_CREDENTIAL_PARAMS = /(^|[?&"\s])(wsTicket|dpop)=[^&#"\\\s]*/g;
 
-const redactUrlCredentials = (text: string) =>
-  text.replace(URL_CREDENTIAL_PARAMS, "$1$2=<redacted>");
+// Hardened fork: also masks keys, tokens and credential-named values anywhere in the text.
+const redactSecretsInLogs = secretRedactionEnabled(globalThis.process?.env);
+const redactUrlCredentials = (text: string) => {
+  const withoutTickets = text.replace(URL_CREDENTIAL_PARAMS, "$1$2=<redacted>");
+  return redactSecretsInLogs ? redactSecrets(withoutTickets) : withoutTickets;
+};
 
 export const makeTraceSink = Effect.fn("makeTraceSink")(function* (options: TraceSinkOptions) {
   const sink = yield* makeAsyncRotatingFileSink({

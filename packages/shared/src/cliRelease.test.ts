@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { cliArchiveTarCommand, newestCliReleaseVersion, parseChecksums } from "./cliRelease.ts";
+import {
+  cliArchiveTarCommand,
+  cliReleaseAssetUrl,
+  cliReleaseDownloadBaseUrl,
+  cliReleaseIndexPageUrl,
+  newestCliReleaseVersion,
+  parseChecksums,
+} from "./cliRelease.ts";
 
 describe("cliRelease", () => {
   it("parses sha256sum output including binary-mode markers", () => {
@@ -38,5 +45,20 @@ describe("cliRelease", () => {
     expect(newestCliReleaseVersion(releases, "nightly")).toBe("1.2.4-nightly.20260912.7");
     expect(newestCliReleaseVersion(releases, "stable")).toBe("1.2.3");
     expect(newestCliReleaseVersion([{ tag_name: "v1.2.3" }], "preview")).toBeUndefined();
+  });
+
+  it("defaults release downloads and lookups to the hardened fork, never upstream", () => {
+    const urls = [
+      cliReleaseDownloadBaseUrl("1.2.3"),
+      cliReleaseAssetUrl("1.2.3", "SHA256SUMS"),
+      cliReleaseIndexPageUrl(1),
+    ];
+    for (const url of urls) {
+      expect(url).toContain("/sasanokusa/t3code/");
+      expect(url).not.toContain("pingdotgg");
+    }
+    expect(cliReleaseDownloadBaseUrl("1.2.3", "https://mirror.example/t3/")).toBe(
+      "https://mirror.example/t3/v1.2.3",
+    );
   });
 });

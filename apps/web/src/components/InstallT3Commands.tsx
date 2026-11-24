@@ -4,8 +4,8 @@ import { cn } from "~/lib/utils";
 import { CommandBlock } from "./CommandBlock";
 
 /**
- * Setup steps for another computer: install `t3`, then run `command`. Both installers are shown
- * because the browser showing this is often not the computer being set up.
+ * Setup steps for another computer: install `t3`, then run `command`.
+ * Hardened fork: no upstream installers; `t3` comes from a source build of the fork.
  */
 export function InstallT3Commands({
   command,
@@ -16,10 +16,7 @@ export function InstallT3Commands({
 }) {
   return (
     <div className={cn("space-y-2", className)}>
-      <p className="text-xs text-muted-foreground">macOS, Linux</p>
-      <CommandBlock command="curl -fsSL https://t3.codes/install.sh | sh" />
-      <p className="text-xs text-muted-foreground">Windows (PowerShell)</p>
-      <CommandBlock command="irm https://t3.codes/install.ps1 | iex" />
+      <CommandBlock command="git clone https://github.com/sasanokusa/t3code && cd t3code && vp i && vp run build:desktop" />
       <p className="text-xs text-muted-foreground">
         <T>Then</T>
       </p>

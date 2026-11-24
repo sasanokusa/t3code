@@ -17,6 +17,11 @@ vi.mock("expo-constants", () => ({
   },
 }));
 
+// Hardened fork: with no traces URL configured there is no default endpoint, so tracing is off.
+it("leaves tracing off without explicit configuration", () => {
+  expect(Tracing.resolveTracingConfig()).toBeNull();
+});
+
 it.effect("does not let OTLP serialization failures alter application effects", () => {
   const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 202 }));
   const layerTracing = Tracing.layerFromConfig(

@@ -1408,7 +1408,11 @@ export const ServerSettings = Schema.Struct({
   agentFeedback: Schema.Struct({
     mode: AgentFeedbackMode.pipe(Schema.withDecodingDefaultKey(Effect.succeed("off" as const))),
   }).pipe(Schema.withDecodingDefault(Effect.succeed({ mode: "off" as const }))),
-  enableProviderUpdateChecks: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  // Hardened fork: off by default; on, every enabled provider's CLI release feed and T3's model
+  // manifest on GitHub are polled hourly.
+  enableProviderUpdateChecks: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(false)),
+  ),
   continueThreadsAfterServerUpdate: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(true)),
   ),

@@ -66,7 +66,13 @@ async function fetchReleases(url: string, accept: string, signal: AbortSignal) {
   return response;
 }
 
+// Hardened fork: upstream's GitHub releases are not this fork's, so the lookup never runs.
+const RELEASE_CHECKS_AVAILABLE: boolean = false;
+
 export async function findEnvironmentUpdate(currentVersion: string, signal: AbortSignal) {
+  if (!RELEASE_CHECKS_AVAILABLE) {
+    throw new Error(m(msg("Update checks are not available in this fork.")));
+  }
   const channel = cliReleaseChannelOf(currentVersion);
   // Public release pages avoid the anonymous API quota shared by devices on the same network.
   const response = await fetchReleases(

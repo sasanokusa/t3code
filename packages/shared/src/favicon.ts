@@ -1,6 +1,12 @@
 import { isPublicFaviconHost } from "./hostClassification.ts";
 
+// Hardened fork: icons are never fetched from third parties. Upstream asked Google's favicon
+// service for the host of every link in a conversation and loaded `<origin>/favicon.ico` for tool
+// rows, so link hosts left the machine. Only inline `data:` icons are shown; the rest fall back.
+const FETCH_REMOTE_FAVICONS = false;
+
 function faviconUrlForPage(rawUrl: string | null | undefined, _size = 32): string | null {
+  if (!FETCH_REMOTE_FAVICONS) return null;
   if (!rawUrl || rawUrl.length > 4096) return null;
   try {
     const pageUrl = new URL(rawUrl);
@@ -24,6 +30,7 @@ function themedFaviconUrlForPage(
   rawUrl: string | null | undefined,
   appearance: "light" | "dark",
 ): string | null {
+  if (!FETCH_REMOTE_FAVICONS) return null;
   if (!rawUrl || rawUrl.length > 4096) return null;
   try {
     const pageUrl = new URL(rawUrl);
@@ -39,7 +46,8 @@ function explicitFaviconUrl(rawUrl: string | null | undefined): string | null {
   if (!rawUrl || rawUrl.length > 4096) return null;
   try {
     const url = new URL(rawUrl);
-    return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "data:"
+    return url.protocol === "data:" ||
+      (FETCH_REMOTE_FAVICONS && (url.protocol === "http:" || url.protocol === "https:"))
       ? url.href
       : null;
   } catch {
@@ -72,7 +80,7 @@ export function toolActivityFaviconUrl(
 }
 
 export function faviconUrlForOrigin(rawUrl: string | null | undefined, size = 32): string | null {
-  if (!rawUrl) return null;
+  if (!FETCH_REMOTE_FAVICONS || !rawUrl) return null;
   try {
     const url = new URL(rawUrl);
     if (!url.hostname) return null;

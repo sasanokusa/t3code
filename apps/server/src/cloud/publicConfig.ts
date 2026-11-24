@@ -6,6 +6,7 @@ import {
 import { clerkFrontendApiUrlFromPublishableKey } from "@t3tools/shared/relayAuth";
 import { isRelayTracingEnabled } from "@t3tools/shared/otelEnvironment";
 import { normalizeSecureRelayUrl } from "@t3tools/shared/relayUrl";
+import { blockedEgressSuffix, parseEgressAllowList } from "@t3tools/shared/egressPolicy";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
@@ -21,6 +22,7 @@ declare const __T3CODE_BUILD_RELAY_CLIENT_OTLP_TRACES_DATASET__: string | undefi
 declare const __T3CODE_BUILD_RELAY_CLIENT_OTLP_TRACES_TOKEN__: string | undefined;
 
 const CLOUD_CLI_OAUTH_LOOPBACK_PORT = 34338;
+const FORK_DISABLES_RELAY_TRACING = true;
 const CLOUD_CLI_OAUTH_SCOPES = CONNECT_OAUTH_SCOPES;
 
 function validateRelayUrl(value: string) {
@@ -87,7 +89,8 @@ export function resolveRelayClientTracingConfig(
   env: Readonly<Record<string, string | undefined>> = process.env,
   fallback = buildTimeRelayClientTracing,
 ) {
-  if (!isRelayTracingEnabled(env)) {
+  // Hardened fork: relay client spans are never exported (upstream sent them to Axiom).
+  if (FORK_DISABLES_RELAY_TRACING || !isRelayTracingEnabled(env)) {
     return null;
   }
 
@@ -99,6 +102,36 @@ export function resolveRelayClientTracingConfig(
   return normalizedTracesUrl && tracesDataset && tracesToken
     ? { tracesUrl: normalizedTracesUrl, tracesDataset, tracesToken }
     : null;
+}
+
+/**
+ * Hardened fork: the relay T3 Connect may use, from `T3CODE_RELAY_URL` or the build, or null when
+ * none is set or it is one of T3's hosts. Without one, T3 Connect stays off entirely, including a
+ * link and managed tunnel an upstream build left in the secret store.
+ */
+function configuredForkRelayUrl(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  fallback = buildTimeRelayUrl,
+): string | null {
+  const relayUrl = normalizeSecureRelayUrl(env.T3CODE_RELAY_URL?.trim() || fallback);
+  return relayUrl === null ||
+    blockedEgressSuffix(relayUrl, parseEgressAllowList(env.T3CODE_EGRESS_ALLOW)) !== undefined
+    ? null
+    : relayUrl;
+}
+
+/**
+ * Whether this build may run T3 Connect at all. `T3CODE_CONNECT_WITHOUT_RELAY_CHECK=1` skips the
+ * self-hosted-relay requirement; upstream's Connect tests set it, and T3's hosts stay blocked by
+ * the egress guard either way.
+ */
+export function forkAllowsConnect(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  fallback = buildTimeRelayUrl,
+): boolean {
+  return (
+    env.T3CODE_CONNECT_WITHOUT_RELAY_CHECK === "1" || configuredForkRelayUrl(env, fallback) !== null
+  );
 }
 
 export function makeRelayUrlConfig(fallback = buildTimeRelayUrl) {

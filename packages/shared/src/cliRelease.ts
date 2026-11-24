@@ -3,7 +3,11 @@ import * as Schema from "effect/Schema";
 
 import { compareSemverVersions } from "./semver.ts";
 
-const CLI_RELEASE_REPOSITORY = "pingdotgg/t3code";
+// Hardened fork: default downloads and release lookups to the fork, never upstream builds.
+const CLI_RELEASE_REPOSITORY = "sasanokusa/t3code";
+/** Set: every self-update path refuses with this reason instead of fetching a release. */
+export const CLI_SELF_UPDATE_DISABLED_REASON: string | undefined =
+  "Self-update is disabled in this fork; pull and rebuild from source.";
 export const CLI_RELEASES_PAGE_URL = `https://github.com/${CLI_RELEASE_REPOSITORY}/releases`;
 export const CLI_RELEASE_CHECKSUMS_FILE = "SHA256SUMS";
 export const CLI_RELEASE_BASE_URL_ENV = "T3CODE_RELEASE_BASE_URL";

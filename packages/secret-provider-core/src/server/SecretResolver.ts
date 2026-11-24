@@ -90,9 +90,11 @@ export const make = Effect.fn("SecretResolver.make")(function* (options: {
     return entry !== undefined && entry.config === plan.configKey && entry.expiresAt > now;
   };
 
-  // Drop the plaintext when it expires even if nothing reads it again.
+  // Drop the plaintext when it expires even if nothing reads it again. A plain unref'd timer, so
+  // eviction needs no fiber that outlives the read and never keeps the process alive.
   const store = (key: string, entry: CachedSecret) => {
     cache.set(key, entry);
+    // @effect-diagnostics-next-line globalTimers:off
     const timer = setTimeout(() => {
       if (cache.get(key) === entry) cache.delete(key);
     }, cacheTtlMs);

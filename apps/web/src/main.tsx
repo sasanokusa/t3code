@@ -1,5 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { guardFetch, guardWebSocket } from "@t3tools/shared/egressPolicy";
+
+// Hardened fork: the web client never reaches T3-owned or telemetry hosts.
+globalThis.fetch = guardFetch(globalThis.fetch.bind(globalThis));
+globalThis.WebSocket = guardWebSocket(globalThis.WebSocket);
 
 import "@fontsource-variable/inter";
 import "./index.css";

@@ -11,6 +11,7 @@ import { ChildProcessSpawner } from "effect/process";
 import * as NetService from "@t3tools/shared/Net";
 
 import * as EnvironmentAuthPolicy from "../auth/EnvironmentAuthPolicy.ts";
+import * as PublicConfig from "../cloud/publicConfig.ts";
 import * as ManagedLimits from "./managedLimits.ts";
 import * as ManagedPolicy from "./ManagedPolicy.ts";
 
@@ -129,6 +130,20 @@ it.effect("tells clients Connect is off when the policy leaves out remote client
     assert.isFalse(ManagedLimits.allowsConnect(policy({ connect: false })));
   }),
 );
+
+it("keeps T3 Connect off without a self-hosted relay, and never allows T3's relay", () => {
+  const open = { document: undefined };
+  assert.isFalse(ManagedLimits.allowsConnect(open, false));
+  assert.isTrue(ManagedLimits.allowsConnect(open, true));
+  assert.isFalse(PublicConfig.forkAllowsConnect({}, ""));
+  assert.isFalse(
+    PublicConfig.forkAllowsConnect({ T3CODE_RELAY_URL: "https://relay.t3.codes" }, ""),
+  );
+  assert.isFalse(PublicConfig.forkAllowsConnect({}, "https://relay.t3.codes"));
+  assert.isTrue(
+    PublicConfig.forkAllowsConnect({ T3CODE_RELAY_URL: "https://relay.saserver.test" }, ""),
+  );
+});
 
 it.effect(
   "turns off only the Tailscale Serve routes that forward here, and refuses to start if one stays",

@@ -61,6 +61,8 @@ export function resolveCloudPublicConfig(): CloudPublicConfig {
   };
 }
 
+const FORK_DISABLES_RELAY_TRACING = true;
+
 let desktopRelayTelemetry: boolean | null = null;
 
 /** Whether relay spans may be exported now; the desktop host may not know yet at startup. */
@@ -71,6 +73,8 @@ export function relayTelemetryEnabled(): boolean | null {
 }
 
 export function resolveRelayTracingConfig() {
+  // Hardened fork: relay spans are never exported (upstream sent them to Axiom).
+  if (FORK_DISABLES_RELAY_TRACING) return null;
   // The relay exporter is created during module initialization, so this must be synchronous.
   if (relayTelemetryEnabled() === false) {
     return null;

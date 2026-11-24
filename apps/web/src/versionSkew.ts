@@ -105,17 +105,11 @@ export function manualServerUpdateCommand(
   targetVersion: string,
   installation?: ServerInstallation,
 ): string {
-  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-  if (installation?.kind === "npm-global") {
-    return `npm install --global --prefix ${quote(installation.prefix)} t3@${targetVersion}`;
-  }
-  if (installation?.kind === "t3-launcher") {
-    // An inherited T3CODE_HOME would otherwise send the update to a home the launcher is not in.
-    return `${quote(installation.launcher)} update --base-dir ${quote(installation.baseDir)} ${targetVersion}`;
-  }
-  const runner =
-    installation?.kind === "pnpm-dlx" ? "pnpm dlx" : installation?.kind === "bunx" ? "bunx" : "npx";
-  return `${runner} t3@${targetVersion}`;
+  // Hardened fork: the `t3` package on npm and upstream's launcher install the official build, so
+  // every server is updated by rebuilding the fork from source.
+  void targetVersion;
+  void installation;
+  return "git pull && vp i && vp run build";
 }
 
 export function buildVersionMismatchDismissalKey(

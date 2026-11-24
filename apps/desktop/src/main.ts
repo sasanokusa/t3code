@@ -1,9 +1,16 @@
 import * as MacPermissions from "./permissions/MacPermissions.ts";
 import { handleStdioError } from "./app/stdioErrors.ts";
+import { guardFetch, parseEgressAllowList } from "@t3tools/shared/egressPolicy";
 
 for (const stream of [process.stdout, process.stderr]) {
   stream.on("error", handleStdioError);
 }
+
+// Hardened fork: the main process never reaches T3-owned or telemetry hosts either.
+globalThis.fetch = guardFetch(
+  globalThis.fetch,
+  parseEgressAllowList(process.env.T3CODE_EGRESS_ALLOW),
+);
 
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";

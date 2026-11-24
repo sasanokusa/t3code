@@ -14,6 +14,11 @@ export function configuredHostedAppUrl(): string {
   return import.meta.env.VITE_HOSTED_APP_URL?.trim() || DEFAULT_HOSTED_APP_URL;
 }
 
+/** Hardened fork: only a hosted app this build was pointed at, never T3's app.t3.codes. */
+export function hasSelfHostedApp(): boolean {
+  return (import.meta.env.VITE_HOSTED_APP_URL?.trim() ?? "") !== "";
+}
+
 function configuredBackendUrl(): string {
   return import.meta.env.VITE_HTTP_URL?.trim() || import.meta.env.VITE_WS_URL?.trim() || "";
 }

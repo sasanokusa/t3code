@@ -22,6 +22,7 @@ import { HttpClient } from "effect/http";
 
 import {
   CLI_RELEASE_BASE_URL_ENV,
+  CLI_SELF_UPDATE_DISABLED_REASON,
   cliReleaseChannelOf,
   crossesReleaseTrack,
 } from "@t3tools/shared/cliRelease";
@@ -49,6 +50,8 @@ export function resolveServerSelfUpdateCapability(input: {
   readonly desktopManaged: boolean;
   readonly launcherManaged: boolean;
 }): ServerSelfUpdateCapability | null {
+  // Hardened fork: advertise no self-update, so clients never offer one.
+  if (CLI_SELF_UPDATE_DISABLED_REASON !== undefined) return null;
   if (input.desktopManaged) return "desktop-managed" as const;
   return input.launcherManaged ? ("boot-service" as const) : null;
 }
@@ -172,6 +175,10 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
   const update: ServerSelfUpdate["Service"]["update"] = Effect.fn(
     "cloud.server_self_update.update",
   )(function* (input, reportProgress = () => Effect.void, onHandoffAccepted = () => Effect.void) {
+    // Hardened fork: refuse before any download or desktop handoff; older clients still ask.
+    if (CLI_SELF_UPDATE_DISABLED_REASON !== undefined) {
+      return yield* failWith(CLI_SELF_UPDATE_DISABLED_REASON);
+    }
     const policyRefusal = managedUpdateRefusal(
       policy.document,
       capability === "boot-service" ? cliReleaseChannelOf(input.targetVersion.trim()) : undefined,
@@ -296,6 +303,10 @@ export const make = Effect.fn("cloud.server_self_update.make")(function* () {
     update,
     commitDesktopUpdate: Effect.fn("ServerSelfUpdate.commitDesktopUpdate")(
       function (requestId, onHandoffAccepted) {
+        // Hardened fork: never apply a desktop update, which comes from upstream releases.
+        if (CLI_SELF_UPDATE_DISABLED_REASON !== undefined) {
+          return Effect.fail(failWith(CLI_SELF_UPDATE_DISABLED_REASON));
+        }
         return desktopAppUpdate.commit(requestId, onHandoffAccepted);
       },
     ),

@@ -45,6 +45,7 @@ import { m } from "../i18n/messages.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
 import { makeQuitShortcutHandler } from "./QuitHold.ts";
 import { copyContextMenuImage } from "./ContextMenuImage.ts";
+import { installMainWindowEgressBlockPolicy } from "./EgressBlockPolicy.ts";
 import { installMainWindowRemoteRequestHeaderPolicy } from "./RemoteRequestHeaders.ts";
 
 const TITLEBAR_HEIGHT = 40;
@@ -1059,6 +1060,7 @@ export const make = Effect.gen(function* () {
         isDevelopment: environment.isDevelopment,
       },
     );
+    installMainWindowEgressBlockPolicy(window.webContents.session);
     loadApplication();
     if (environment.isDevelopment) {
       window.webContents.openDevTools({ mode: "detach" });

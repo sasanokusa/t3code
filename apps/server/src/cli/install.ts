@@ -53,11 +53,10 @@ export const installCli = Effect.fn("cli.install.install")(function* () {
   const runtime = yield* standaloneRuntime;
   const windows = platform === "win32";
   if (Option.isNone(runtime)) {
-    const script = windows
-      ? "irm https://t3.codes/install.ps1 | iex"
-      : "curl -fsSL https://t3.codes/install.sh | sh";
+    // Hardened fork: no upstream installer to suggest; t3 comes from a source build of the fork.
     return yield* new CliInstallError({
-      reason: `Only the standalone t3 can install itself. Use \`${script}\`, or Settings in the desktop app.`,
+      reason:
+        "Only the standalone t3 can install itself. Build t3 from this fork's source, or use Settings in the desktop app.",
     });
   }
   const { executable, versionsDir, runtimeDir } = runtime.value;

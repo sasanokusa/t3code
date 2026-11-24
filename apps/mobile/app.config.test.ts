@@ -1,8 +1,4 @@
-import { DEFAULT_HOSTED_APP_URL } from "@t3tools/shared/connectAuth";
 import { afterEach, expect, it, vi } from "vite-plus/test";
-
-import appleAppSiteAssociation from "../web/public/.well-known/apple-app-site-association.json";
-import assetLinks from "../web/public/.well-known/assetlinks.json";
 
 // Keep config parsing independent of local env files and build credentials.
 vi.mock("../../scripts/lib/public-config.ts", () => ({
@@ -34,14 +30,21 @@ it.each([
   const config = await loadConfig(value);
   expect(config.ios?.bundleIdentifier).toBe(identifier);
   expect(config.android?.package).toBe(identifier);
-  // Copied thread links open this app only while app.t3.codes lists it.
-  const host = new URL(DEFAULT_HOSTED_APP_URL).host;
-  expect(config.ios?.associatedDomains).toContain(`applinks:${host}`);
-  expect(appleAppSiteAssociation.applinks.details[0]?.appIDs).toContain(
-    `${config.ios?.appleTeamId}.${identifier}`,
-  );
-  expect(config.android?.intentFilters?.[0]?.data).toEqual([
-    { scheme: "https", host, pathPrefix: "/threads/" },
-  ]);
-  expect(assetLinks.map((link) => link.target.package_name)).toContain(identifier);
 });
+
+// Hardened fork: nothing in the config points the app or the OS at T3's or Axiom's servers.
+it.each([undefined, "development", "preview", "production"])(
+  "keeps T3 hosts, OTA updates and telemetry defaults out of APP_VARIANT=%j",
+  async (value) => {
+    const config = await loadConfig(value);
+    expect(config.updates?.enabled).toBe(false);
+    expect(config.updates?.url).toBeUndefined();
+    expect(config.updates?.checkAutomatically).toBe("NEVER");
+    expect(config.owner).toBeUndefined();
+    expect(config.ios?.associatedDomains).toBeUndefined();
+    expect(config.android?.intentFilters).toBeUndefined();
+    expect(config.extra?.observability?.tracesUrl).toBeNull();
+    expect(config.extra?.eas?.observe?.endpointUrl).toBe("https://observe.invalid");
+    expect(JSON.stringify(config)).not.toMatch(/t3\.codes|axiom|u\.expo\.dev|pingdotgg|d763fcb8/);
+  },
+);

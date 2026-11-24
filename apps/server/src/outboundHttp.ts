@@ -3,6 +3,8 @@ import * as NodeNet from "node:net";
 
 import type * as Undici from "undici";
 
+import { guardFetch, guardWebSocket, parseEgressAllowList } from "@t3tools/shared/egressPolicy";
+
 // undici is external to the CLI bundle; Node single-executables can load it from disk only with require.
 const requireUndici = NodeModule.createRequire(import.meta.url);
 
@@ -65,4 +67,22 @@ export function extendConnectionAttemptTimeout(): void {
   NodeNet.setDefaultAutoSelectFamilyAttemptTimeout(
     Math.max(NodeNet.getDefaultAutoSelectFamilyAttemptTimeout(), 1_000),
   );
+}
+
+/**
+ * Hardened fork: refuses T3-owned and telemetry hosts for every `fetch` and `WebSocket` in this
+ * process, including ones that stored state from an upstream build would reach (a relay URL saved
+ * by an earlier T3 Connect link, for example). `T3CODE_EGRESS_ALLOW` lets named hosts through.
+ */
+export function installEgressGuard(env: NodeJS.ProcessEnv = process.env): void {
+  const allow = parseEgressAllowList(env.T3CODE_EGRESS_ALLOW);
+  // Provider SDKs and CLIs this server runs inherit these: the Claude Agent SDK otherwise sends
+  // events to Datadog. A value the user set explicitly is kept.
+  env.DISABLE_TELEMETRY ??= "1";
+  env.DISABLE_ERROR_REPORTING ??= "1";
+  env.DO_NOT_TRACK ??= "1";
+  globalThis.fetch = guardFetch(globalThis.fetch, allow);
+  if (typeof globalThis.WebSocket === "function") {
+    globalThis.WebSocket = guardWebSocket(globalThis.WebSocket, allow);
+  }
 }

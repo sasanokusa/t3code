@@ -3,9 +3,9 @@ import { describe, expect, it } from "@effect/vitest";
 import { faviconUrlForOrigin, toolActivityFaviconUrl } from "./favicon.ts";
 
 describe("faviconUrlForOrigin", () => {
-  it("sends only the public hostname and requested size, never the port", () => {
+  it("never asks a third-party favicon service about a link's host", () => {
     expect(faviconUrlForOrigin("https://github.com:8443/pingdotgg/t3code?private=query", 64)).toBe(
-      "https://www.google.com/s2/favicons?domain=github.com&sz=64",
+      null,
     );
   });
 
@@ -19,27 +19,25 @@ describe("faviconUrlForOrigin", () => {
 });
 
 describe("toolActivityFaviconUrl", () => {
-  it("uses the page origin instead of a third-party favicon service", () => {
-    expect(toolActivityFaviconUrl({ pageUrl: "https://example.com/docs/page?q=1" }, "light")).toBe(
-      "https://example.com/favicon.ico",
-    );
-    expect(toolActivityFaviconUrl({ pageUrl: "http://localhost:5173/app" }, "light")).toBe(
-      "http://localhost:5173/favicon.ico",
-    );
+  it("does not fetch favicons from the page's origin", () => {
+    expect(
+      toolActivityFaviconUrl({ pageUrl: "https://example.com/docs/page?q=1" }, "light"),
+    ).toBeNull();
+    expect(toolActivityFaviconUrl({ pageUrl: "https://github.com/x" }, "dark")).toBeNull();
   });
 
-  it("accepts provider-supplied image URLs but rejects extension URLs", () => {
+  it("shows only inline provider icons", () => {
     expect(
       toolActivityFaviconUrl(
         { pageUrl: "https://example.com/docs", faviconUrl: "https://example.com/icon.png" },
         "light",
       ),
-    ).toBe("https://example.com/icon.png");
+    ).toBeNull();
     expect(
       toolActivityFaviconUrl(
-        { pageUrl: "https://example.com/docs", faviconUrl: "chrome-extension://example/_favicon/" },
+        { pageUrl: "https://example.com/docs", faviconUrl: "data:image/png;base64,AAAA" },
         "light",
       ),
-    ).toBe("https://example.com/favicon.ico");
+    ).toBe("data:image/png;base64,AAAA");
   });
 });

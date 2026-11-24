@@ -1,7 +1,9 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import type { ManagedUpdatesPolicy } from "@t3tools/contracts";
+import { CLI_SELF_UPDATE_DISABLED_REASON } from "@t3tools/shared/cliRelease";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as NetService from "@t3tools/shared/Net";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -11,6 +13,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as TestClock from "effect/testing/TestClock";
 import * as TestConsole from "effect/testing/TestConsole";
+import { Command } from "effect/cli";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
@@ -29,10 +32,12 @@ import {
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import {
+  CliUpdateError,
   repointLauncher,
   resolveMirrorVersion,
   resolveNewestVersion,
   runUpdate,
+  updateCommand,
 } from "./update.ts";
 
 // lsof listing one process, so prune sees a process list in which no runtime is running.
@@ -52,28 +57,39 @@ const unrelatedLsof = ProcessRunner.ProcessRunner.of({
 
 afterEach(() => vi.restoreAllMocks());
 
-it.effect("authenticates each release page until the requested channel is found", () =>
+// Hardened fork: `t3 update` never lists releases, so GH_TOKEN never leaves this machine.
+it.effect("refuses to list releases or send GH_TOKEN anywhere", () =>
   Effect.gen(function* () {
-    const pages: string[] = [];
-    const httpClient = HttpClient.make((request) => {
-      const url = new URL(request.url);
-      assert.equal(url.origin, "https://api.github.com");
-      assert.equal(url.pathname, "/repos/pingdotgg/t3code/releases");
-      assert.equal(request.headers.accept, "application/vnd.github+json");
-      assert.equal(request.headers.authorization, "Bearer gh-token");
-      const page = url.searchParams.get("page") ?? "";
-      pages.push(page);
-      const tag_name = page === "1" ? "v1.2.4-preview.20260101.1" : "v1.2.3";
-      return Effect.succeed(HttpClientResponse.fromWeb(request, Response.json([{ tag_name }])));
-    });
-    const version = yield* resolveNewestVersion("stable").pipe(
-      Effect.provideService(HostProcess.Environment, { GH_TOKEN: "gh-token" }),
-      Effect.provideService(HttpClient.HttpClient, httpClient),
+    const error = yield* resolveNewestVersion("stable").pipe(
+      Effect.flip,
+      Effect.provideService(HostProcess.Environment, {
+        GH_TOKEN: "gh-token",
+        GITHUB_TOKEN: "gh-token",
+      }),
+      Effect.provideService(
+        HttpClient.HttpClient,
+        HttpClient.make(() => Effect.die("unexpected release lookup")),
+      ),
     );
-    assert.equal(version, "1.2.3");
-    assert.deepStrictEqual(pages, ["1", "2"]);
+    assert.equal(error.message, CLI_SELF_UPDATE_DISABLED_REASON);
   }),
 );
+
+it.layer(NodeServices.layer)("t3 update command", (it) => {
+  it.effect("fails with the hardened fork's rebuild-from-source message", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-update-cli-" });
+      const error = yield* Command.runWith(updateCommand, { version: "0.0.0" })([
+        "--base-dir",
+        baseDir,
+      ]).pipe(Effect.flip);
+      assert.instanceOf(error, CliUpdateError);
+      assert.equal(error.message, CLI_SELF_UPDATE_DISABLED_REASON);
+      assert.deepStrictEqual(yield* fs.readDirectory(baseDir), []);
+    }).pipe(Effect.provide(Layer.merge(NetService.layer, TestConsole.layer))),
+  );
+});
 
 it.effect("reads the newest version from the update feed file a mirror publishes", () =>
   Effect.gen(function* () {

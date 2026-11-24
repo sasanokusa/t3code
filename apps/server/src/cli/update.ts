@@ -2,6 +2,7 @@ import * as HostProcess from "@t3tools/shared/HostProcess";
 import {
   CLI_RELEASE_BASE_URL_ENV,
   CLI_RELEASE_CHANNELS,
+  CLI_SELF_UPDATE_DISABLED_REASON,
   cliReleaseIndexPageUrl,
   cliReleaseChannelOf,
   newestCliReleaseVersion,
@@ -75,6 +76,10 @@ const RELEASE_INDEX_MAX_PAGES = 10;
 export const resolveNewestVersion = Effect.fn("cli.update.resolve_newest")(function* (
   channel: CliReleaseChannel,
 ) {
+  // Hardened fork: never list releases, so GH_TOKEN is never sent anywhere.
+  if (CLI_SELF_UPDATE_DISABLED_REASON !== undefined) {
+    return yield* new CliUpdateError({ reason: CLI_SELF_UPDATE_DISABLED_REASON });
+  }
   const httpClient = yield* HttpClient.HttpClient;
   const environment = yield* HostProcess.Environment;
   const githubToken = environment.GH_TOKEN?.trim() || environment.GITHUB_TOKEN?.trim() || undefined;
@@ -282,6 +287,10 @@ export const updateCommand = Command.make("update", {
   ),
   Command.withHandler((flags) =>
     Effect.gen(function* () {
+      // Hardened fork: an update would install an upstream build; the fork updates from source.
+      if (CLI_SELF_UPDATE_DISABLED_REASON !== undefined) {
+        return yield* new CliUpdateError({ reason: CLI_SELF_UPDATE_DISABLED_REASON });
+      }
       const logLevel = yield* GlobalFlag.LogLevel;
       const config = yield* resolveCliAuthConfig(flags, logLevel);
       return yield* runUpdate({

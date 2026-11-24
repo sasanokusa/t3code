@@ -177,7 +177,7 @@ export default mergeConfig(
       setupFiles: [
         "./src/testUtils/gitConfig.setup.ts",
         "./src/testUtils/managedServiceEnv.setup.ts",
-        "./src/testUtils/secretsKeychain.setup.ts",
+        "./src/testUtils/hardenedFork.setup.ts",
       ],
       hookTimeout: 120_000,
       testTimeout: 120_000,

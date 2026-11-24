@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 import { environmentReleaseCheckAtom, releaseCheckError } from "./environmentUpdateCheck";
 
+// Hardened fork: the real lookup never fetches, so a fetching stand-in keeps the atom's abort tests.
+vi.mock("./environment-maintenance", () => ({
+  findEnvironmentUpdate: async (_version: string, signal: AbortSignal) => {
+    await fetch("https://releases.invalid", { signal });
+    return null;
+  },
+}));
+
 function stubHangingFetch() {
   const { promise: called, resolve } = Promise.withResolvers<AbortSignal>();
   vi.stubGlobal("fetch", (_url: string, init: { signal: AbortSignal }) => {

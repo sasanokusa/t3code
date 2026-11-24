@@ -231,6 +231,14 @@
       "types": "./src/telemetryId.ts",
       "import": "./src/telemetryId.ts"
     },
+    "./egressPolicy": {
+      "types": "./src/egressPolicy.ts",
+      "import": "./src/egressPolicy.ts"
+    },
+    "./secretRedaction": {
+      "types": "./src/secretRedaction.ts",
+      "import": "./src/secretRedaction.ts"
+    },
     "./relayAuth": {
       "types": "./src/relayAuth.ts",
       "import": "./src/relayAuth.ts"
