@@ -53,9 +53,15 @@ SDK otherwise sends events to Datadog (`apps/server/src/outboundHttp.ts`).
   `T3CODE_LOG_REDACT_SECRETS=off` turns masking off for debugging
   (`packages/shared/src/secretRedaction.ts`).
 
-**Limits.** A keychain item can still be read by another process of the same user that asks the OS
-for it. macOS may prompt, depending on the item's access list. Encryption keeps secrets out of greps,
-backups and accidental reads; it does not isolate them from a determined local process.
+**Limits.** On macOS the key is written with `/usr/bin/security`, so its access list trusts that
+tool. Any process of the same user can read it without a prompt by running
+`security find-generic-password -s "T3 Code secrets key" -w`. Encryption keeps secrets out of greps,
+backups and casual file reads (an agent that `cat`s `~/.t3`). It does not stop a local process that
+deliberately asks the keychain. Closing that gap would mean handing the key over from the desktop
+app's own signed keychain item (Electron `safeStorage`), which this fork does not do yet.
+
+The desktop app's Clerk session (`userdata/clerk/clerk-tokens.json`) is still a plaintext file.
+This build never signs in to Clerk, so it only matters for a session an official build left behind.
 
 Secret-request files (`secrets/files/`), which hand a secret to an agent as a file, stay plaintext
 by design and expire as before.
@@ -63,11 +69,14 @@ by design and expire as before.
 ### Network egress
 
 - **Egress guard.** Hosts under the following domains are refused for every `fetch` and `WebSocket`
-  in the server, the desktop main process and the web client:
+  in the server (which covers its Effect `HttpClient`), the web client and the desktop main
+  process's global `fetch`:
   - `t3.codes`, `t3.chat`, `t3.gg`, `ping.gg`
   - `posthog.com`, `axiom.co`, `sentry.io`
 
-  The desktop also blocks them at the main window's Electron session. To let a host through on
+  The desktop also blocks them at the main window's Electron session. The desktop main process's
+  own undici `HttpClient` is not guarded; it only talks to the local backend, Tailscale and SSH
+  hosts. To let a host through on
   purpose, list it in `T3CODE_EGRESS_ALLOW` (comma separated). Code:
   `packages/shared/src/egressPolicy.ts`, `apps/server/src/outboundHttp.ts`,
   `apps/desktop/src/window/EgressBlockPolicy.ts`.
