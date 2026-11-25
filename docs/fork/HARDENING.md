@@ -134,8 +134,23 @@ ready for a self-hosted one:
 3. Build the fork with `T3CODE_RELAY_URL=https://<your relay>` in `.env`, plus your own Clerk keys
    if the relay uses Clerk.
 
-Until then, use remote access without a relay: run the server on saserver and connect over
-Tailscale.
+Until then, reach the host over Tailscale instead. Run `t3 pair --tailscale` on the host, or turn
+on **Tailscale HTTPS** in the desktop app's Settings → Sharing & access. The server stays on
+loopback, and `tailscale serve` publishes it as `https://<machine>.<tailnet>.ts.net` to the tailnet
+only. This also works on networks that block UDP or unusual ports, such as school or office
+Wi-Fi: Tailscale then relays over HTTPS (port 443). T3 Connect's Cloudflare tunnel needs port 7844.
+
+On a phone that already knows the host through T3 Connect, add the pairing link from that
+environment's settings with **Add route**. Adding it as a new environment is refused, because the
+host is already saved.
+
+T3 Code runs `tailscale` from `PATH`. The Mac App Store build of Tailscale keeps its CLI inside the
+app bundle, so put a wrapper on `PATH`:
+
+```sh
+#!/bin/sh
+exec /Applications/Tailscale.app/Contents/MacOS/Tailscale "$@"
+```
 
 ## Pulling upstream
 

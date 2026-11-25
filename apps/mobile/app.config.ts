@@ -251,7 +251,8 @@ const config: ExpoConfig = {
     requireFullScreen: process.env.T3_SHOWCASE_CAPTURE_BUILD === "1",
     bundleIdentifier: iosBundleIdentifier,
     // Avoid Personal Team fallback: it cannot sign App Groups, Apple sign-in or push entitlements.
-    appleTeamId: "ARK85ZXQ4Z",
+    // A Personal Team build leaves the team unset so `expo run:ios` signs with the developer's own.
+    ...(isIosPersonalTeamBuild ? {} : { appleTeamId: "ARK85ZXQ4Z" }),
     // Hardened fork: no associated domains, so iOS never fetches T3's apple-app-site-association.
     entitlements: {
       "keychain-access-groups": [`$(AppIdentifierPrefix)${variant.iosBundleIdentifier}`],

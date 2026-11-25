@@ -2,16 +2,22 @@ import { afterEach, expect, it, vi } from "vite-plus/test";
 
 // Keep config parsing independent of local env files and build credentials.
 vi.mock("../../scripts/lib/public-config.ts", () => ({
-  loadRepoEnv: () => ({ APP_VARIANT: process.env.APP_VARIANT }),
+  loadRepoEnv: () => ({
+    APP_VARIANT: process.env.APP_VARIANT,
+    T3CODE_IOS_PERSONAL_TEAM: process.env.T3CODE_IOS_PERSONAL_TEAM,
+    T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID: process.env.T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID,
+  }),
 }));
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-async function loadConfig(variant: string | undefined) {
+async function loadConfig(variant: string | undefined, personalTeamBundleId?: string) {
   vi.resetModules();
   vi.stubEnv("APP_VARIANT", variant);
+  vi.stubEnv("T3CODE_IOS_PERSONAL_TEAM", personalTeamBundleId === undefined ? undefined : "1");
+  vi.stubEnv("T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID", personalTeamBundleId);
   return (await import("./app.config.ts")).default;
 }
 
@@ -30,6 +36,17 @@ it.each([
   const config = await loadConfig(value);
   expect(config.ios?.bundleIdentifier).toBe(identifier);
   expect(config.android?.package).toBe(identifier);
+});
+
+it("leaves a Personal Team build's signing team to the developer", async () => {
+  const config = await loadConfig("production", "com.example.t3code");
+  expect(config.ios?.bundleIdentifier).toBe("com.example.t3code");
+  expect(config.ios?.appleTeamId).toBeUndefined();
+});
+
+it("pins the team for full-capability builds", async () => {
+  const config = await loadConfig("production");
+  expect(config.ios?.appleTeamId).toBe("ARK85ZXQ4Z");
 });
 
 // Hardened fork: nothing in the config points the app or the OS at T3's or Axiom's servers.
