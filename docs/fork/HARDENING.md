@@ -183,10 +183,9 @@ exec /Applications/Tailscale.app/Contents/MacOS/Tailscale "$@"
    re-sign it ad hoc (`codesign --force --deep --sign -`). macOS asks again for keychain access.
 
    Build the Windows installer on the Windows PC (`--platform win --target nsis --arch x64`) and
-   install it with `/S`. A native Windows build adds the server's compile cache to the payload, which
-   then has more files than upstream's 80-file check allows, so raise
-   `WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT` in the build copy. galleria's setup is in the saserver
-   repo (`hosts/galleria-rt5.md`).
+   install it with `/S`. On galleria the server's compile cache brought the payload to 105 files,
+   over the build script's 80-file check, so raise `WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT` in the
+   build copy. galleria's setup is in the saserver repo (`hosts/galleria-rt5.md`).
 
 The audit only reads source. What a dependency sends at runtime is not visible to it: the Claude
 Agent SDK's Datadog reporting was found by running the built server with a fresh `T3CODE_HOME`,
