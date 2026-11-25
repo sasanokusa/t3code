@@ -373,6 +373,7 @@ export const forkSyncCommand = Command.make(
     ),
     merge: Flag.Boolean("merge").pipe(
       Flag.withDescription("Also merge it on sync/<ref> in a worktree next to this checkout."),
+      Flag.withDefault(false),
     ),
   },
   ({ ref, merge }) =>
