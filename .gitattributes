@@ -8,3 +8,15 @@ packages/source-control-github/schema/** linguist-generated
 packages/issue-tracker-linear/schema/** linguist-generated
 apps/server/schema/** linguist-generated
 **/*.graphql.ts linguist-generated
+# Hardened fork: files the fork replaced or removed outright. `scripts/fork-sync.ts` merges upstream
+# with `merge.fork-ours.driver=true`, so these keep the fork's side. Never list a file the fork only
+# edits in places, or upstream fixes to it would be dropped without a conflict.
+.env.example merge=fork-ours
+.task-cache.json merge=fork-ours
+apps/mobile/src/features/settings/environment-maintenance.test.ts merge=fork-ours
+apps/server/src/cloud/npmRelease.test.ts merge=fork-ours
+apps/server/src/cloud/selfUpdate.test.ts merge=fork-ours
+apps/server/src/telemetry/AnalyticsService.test.ts merge=fork-ours
+apps/server/src/telemetry/AnalyticsService.ts merge=fork-ours
+apps/server/src/telemetry/Identify.test.ts merge=fork-ours
+apps/server/src/telemetry/Identify.ts merge=fork-ours
