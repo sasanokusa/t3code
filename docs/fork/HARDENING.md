@@ -154,11 +154,35 @@ exec /Applications/Tailscale.app/Contents/MacOS/Tailscale "$@"
 
 ## Pulling upstream
 
-```bash
-git fetch upstream
-git merge upstream/main
-git grep -n "Hardened fork"   # every fork change is marked; re-check them after the merge
-```
+`origin/main` mirrors upstream untouched; `hardening` is the fork. Track upstream's stable releases
+(`vX.Y.Z`, every few days), not `main`, which takes hundreds of commits a day.
 
-After the merge, look at new code under `apps/server/src/telemetry`, new `fetch` targets and new
-settings defaults.
+1. **Audit.** `node scripts/fork-sync.ts` fetches `upstream`, picks the newest release (or the ref you
+   pass) and test-merges it without touching your checkout. It reports:
+   - conflicts left to resolve by hand
+   - fork-owned files upstream changed
+   - files with fork changes that upstream also changed
+   - whether any `Hardened fork` marker would disappear
+   - new hosts in shipped source, new dependencies, settings default changes, changed dependency
+     patches and changed telemetry code
+
+   Read every section that is not "none".
+
+2. **Merge.** `node scripts/fork-sync.ts --merge` merges the release on `sync/<tag>` in a worktree
+   next to this checkout. Files marked `merge=fork-ours` in `.gitattributes` are the ones the fork
+   replaced or removed outright, and they keep the fork's side. When upstream changed one, carry
+   over interface changes into the fork's version as no-ops. Resolve any other conflicts and commit.
+3. **Verify** in the worktree: `vp i`, `vp run -r typecheck`, then the fork's own tests, i.e. the
+   test files that differ from the release (`git diff --name-only <tag> -- '*.test.ts*'`). Other
+   failing tests are upstream's; compare with the release before chasing them.
+4. **Land.** `git switch hardening && git merge --ff-only sync/<tag> && git push origin hardening`,
+   then remove the worktree and the `sync/<tag>` branch.
+5. **Install.** When no agent is working in T3 Code, build the desktop app
+   (`node scripts/build-desktop-artifact.ts --platform mac --target dir --arch arm64 --build-version
+   <version>-hardened.<n>`), quit the running app, replace `/Applications/T3 Code (Beta).app`, and
+   re-sign it ad hoc (`codesign --force --deep --sign -`). macOS asks again for keychain access.
+
+The audit only reads source. What a dependency sends at runtime is not visible to it: the Claude
+Agent SDK's Datadog reporting was found by running the built server with a fresh `T3CODE_HOME`,
+`NODE_USE_ENV_PROXY=1` and `HTTPS_PROXY` pointing at a local proxy that logs and refuses every
+request. Repeat that after a release that adds or upgrades dependencies.

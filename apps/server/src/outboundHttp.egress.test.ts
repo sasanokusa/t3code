@@ -13,7 +13,7 @@ it.effect("refuses T3 hosts through the server's own HttpClient before any conne
     const originalFetch = globalThis.fetch;
     const originalWebSocket = globalThis.WebSocket;
     const reached: Array<string> = [];
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
+    globalThis.fetch = (async (input: Parameters<typeof fetch>[0]) => {
       reached.push(String(input instanceof Request ? input.url : input));
       return new Response("ok");
     }) as typeof fetch;
