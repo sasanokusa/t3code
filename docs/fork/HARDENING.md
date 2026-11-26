@@ -9,12 +9,12 @@ of logs. Each change is marked in the code with a `Hardened fork:` comment, so
 
 ### Telemetry
 
-| Upstream behavior                                                                                                                                               | Fork                                                                                                      |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `AnalyticsService` batched events to `ingest.t3.codes` (then PostHog) every 10 s, on by default                                                                 | No-op: nothing is buffered or sent (`apps/server/src/telemetry/AnalyticsService.ts`)                      |
-| `Identify.ts` read `~/.codex/auth.json` and `~/.claude.json` and sent unsalted SHA-256 hashes of the OpenAI user id, Claude account UUID and T3 Connect account | Removed: no other tool's files are read and no ids are reported (`apps/server/src/telemetry/Identify.ts`) |
-| Clients sent hashed Connect account and device ids on every WebSocket connect                                                                                   | Never sent (`packages/client-runtime/src/authorization/remote.ts`)                                        |
-| Relay tracing to Axiom (server, web, desktop)                                                                                                                   | Off (`resolveRelayClientTracingConfig` and `resolveRelayTracingConfig` return `null`)                     |
+| Upstream behavior                                                                                                                   | Fork                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `AnalyticsService` batched events to `ingest.t3.codes` (then PostHog) every 10 s, on by default                                     | No-op: nothing is buffered or sent (`apps/server/src/telemetry/AnalyticsService.ts`)  |
+| `Identify.ts` sent unsalted SHA-256 hashes of a random install id and the T3 Connect account, so installs could be linked to people | Removed: no ids are read or reported (`apps/server/src/telemetry/Identify.ts`)        |
+| Clients sent hashed Connect account and device ids on every WebSocket connect                                                       | Never sent (`packages/client-runtime/src/authorization/remote.ts`)                    |
+| Relay tracing to Axiom (server, web, desktop)                                                                                       | Off (`resolveRelayClientTracingConfig` and `resolveRelayTracingConfig` return `null`) |
 
 Provider SDKs and CLIs that the server runs also get `DISABLE_TELEMETRY=1`,
 `DISABLE_ERROR_REPORTING=1` and `DO_NOT_TRACK=1`, unless you set them yourself. The Claude Agent
